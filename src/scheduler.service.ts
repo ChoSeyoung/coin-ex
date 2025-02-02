@@ -12,9 +12,9 @@ export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
 
   private readonly market = SYMBOL.KRW_PEPE;
-  private readonly amount = 10000;
+  private readonly amount = 500000;
   private readonly targetProfitPercent = 0.5; // 목표 수익률 설정
-  private readonly targetStopPercent = 0.5; // 목표 수익률 설정
+  private readonly targetStopPercent = -0.5; // 목표 손실률 설정
 
   constructor(
     private readonly upbitService: UpbitService,
@@ -24,7 +24,7 @@ export class SchedulerService {
   /**
    * 매 5초마다 티커 데이터를 조회하고 조건에 따라 매수 및 매도를 실행합니다.
    */
-  @Cron('*/1 * * * *') // 매 5초마다 실행
+  @Cron('*/1 * * * *')
   async handleBuyScheduler() {
     try {
       const candles = (
@@ -91,7 +91,7 @@ export class SchedulerService {
     }
   }
 
-  @Cron('*/10 * * * * *') // 매 5초마다 실행
+  @Cron('*/10 * * * * *')
   async handleSellScheduler() {
     try {
       const ticker = (await this.upbitService.getTicker(this.market)).find(
@@ -102,9 +102,11 @@ export class SchedulerService {
       const asset = await this.upbitService.getAccountAsset(this.market);
 
       if (asset && asset.avg_buy_price * asset.balance > this.amount) {
-        const avgBuyPrice = parseFloat(asset.avg_buy_price); // 평균 매수가
+        // 평균 매수가
+        const avgBuyPrice = parseFloat(asset.avg_buy_price);
+        // 수익률
         const profitRate =
-          ((currentTickerTradePrice - avgBuyPrice) / avgBuyPrice) * 100; // 수익률 계산
+          ((currentTickerTradePrice - avgBuyPrice) / avgBuyPrice) * 100;
 
         this.logger.log(
           `${this.market} 현재 수익률: ${profitRate.toFixed(2)}%`,
@@ -113,7 +115,7 @@ export class SchedulerService {
         this.logger.debug(
           `[매도] 현재가: ${currentTickerTradePrice} | 수익률: ${profitRate}`,
         );
-        // 목표 수익률 도달 시 매도
+        // 목표 수익률/손실률 도달 시 매도
         if (
           profitRate >= this.targetProfitPercent ||
           profitRate <= this.targetStopPercent

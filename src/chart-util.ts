@@ -16,14 +16,19 @@ export class ChartUtil {
     }
 
     // 가장 최신 데이터 기준으로 볼린저 밴드 계산
-    const slice = closes.slice(-period); // 마지막 'period' 개 데이터 가져오기
-    const middle = slice.reduce((sum, price) => sum + price, 0) / period; // 이동 평균
+    // 마지막 'period' 개 데이터 가져오기
+    const slice = closes.slice(-period);
+    // 이동 평균
+    const middle = slice.reduce((sum, price) => sum + price, 0) / period;
     const variance =
       slice.reduce((sum, price) => sum + Math.pow(price - middle, 2), 0) /
-      period; // 분산
-    const stdDev = Math.sqrt(variance); // 표준 편차
-    const upper = middle + stdMultiplier * stdDev; // 상한선
-    const lower = middle - stdMultiplier * stdDev; // 하한선
+      period;
+    // 표준 편차
+    const stdDev = Math.sqrt(variance);
+    // 상한선
+    const upper = middle + stdMultiplier * stdDev;
+    // 하한선
+    const lower = middle - stdMultiplier * stdDev;
 
     return { middle, upper, lower };
   }
@@ -37,13 +42,16 @@ export class ChartUtil {
   private static calculateEMA(data: number[], weight: number): number {
     if (data.length === 0) return 0;
 
-    const formula = 1 / (1 + (weight - 1)); // 업비트 공식
+    // 업비트 공식
+    const formula = 1 / (1 + (weight - 1));
 
-    let result = data[0]; // 첫 번째 값을 초기 EMA로 설정
+    // 첫 번째 값을 초기 EMA로 설정
+    let result = data[0];
 
     if (data.length > 1) {
       for (let i = 1; i < data.length; i++) {
-        result = data[i] * formula + result * (1 - formula); // EMA 공식 적용
+        // EMA 공식 적용
+        result = data[i] * formula + result * (1 - formula);
       }
     }
 

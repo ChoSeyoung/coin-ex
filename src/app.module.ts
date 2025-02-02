@@ -12,7 +12,7 @@ import { ConfigModule } from '@nestjs/config';
     HttpModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
-      isGlobal: true, // 전역에서 사용 가능
+      isGlobal: true,
       envFilePath:
         process.env.NODE_ENV === 'production'
           ? '.env.production'
