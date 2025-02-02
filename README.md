@@ -11,6 +11,10 @@ pepe coin 1$, let's go
 ## 셋업 | Project setup
 
 ```bash
+# 아래 명령어 실행 후 .env.local 에 ACCESS, SECRET KEY 작성
+$ cp .env.production .env.local
+
+# 의존성 패키지 설치
 $ npm install
 ```
 
