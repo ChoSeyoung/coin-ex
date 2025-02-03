@@ -1,7 +1,7 @@
 export enum SYMBOL {
-  KRW_BTC = 'KRW_BTC',
-  KRW_ETH = 'KRW_ETH',
-  KRW_SOL = 'KRW_SOL',
+  KRW_BTC = 'KRW-BTC',
+  KRW_ETH = 'KRW-ETH',
+  KRW_SOL = 'KRW-SOL',
   KRW_DOGE = 'KRW-DOGE',
   KRW_PEPE = 'KRW-PEPE',
   KRW_SHIB = 'KRW-SHIB',
