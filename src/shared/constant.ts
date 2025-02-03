@@ -1,11 +1,18 @@
 export enum SYMBOL {
+  KRW_BTC = 'KRW_BTC',
+  KRW_ETH = 'KRW_ETH',
+  KRW_SOL = 'KRW_SOL',
   KRW_DOGE = 'KRW-DOGE',
   KRW_PEPE = 'KRW-PEPE',
   KRW_SHIB = 'KRW-SHIB',
   KRW_BONK = 'KRW-BONK',
   KRW_MEW = 'KRW-MEW',
 }
-export const CAPT;
+export const MAIN_THEME_MARKETS = [
+  SYMBOL.KRW_BTC,
+  SYMBOL.KRW_ETH,
+  SYMBOL.KRW_SOL,
+];
 export const MEME_THEME_MARKETS = [
   // 도지코인은 리스크 관리 이후 추가
   // SYMBOL.KRW_DOGE,

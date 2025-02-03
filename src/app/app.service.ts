@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { UpbitService } from '../upbit/upbit.service';
-import { MEME_THEME_MARKETS } from '../shared/constant';
+import { MAIN_THEME_MARKETS, MEME_THEME_MARKETS } from '../shared/constant';
 import { DateUtil } from '../shared/date-util';
 import { ChartUtil } from '../shared/chart-util';
 import { TelegramService } from '../telegram/telegram.service';
@@ -11,7 +11,10 @@ import { MathUtil } from '../shared/math-util';
 export class AppService {
   private readonly logger = new Logger(AppService.name);
 
-  private readonly scheduledMarkets = MEME_THEME_MARKETS;
+  private readonly scheduledMarkets = [
+    ...MAIN_THEME_MARKETS,
+    ...MEME_THEME_MARKETS,
+  ];
   private readonly amount = 10000;
   private readonly targetProfitPercent = 1.0; // 목표 수익률 설정
   private readonly targetStopPercent = -1.0; // 목표 손실률 설정
