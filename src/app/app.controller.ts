@@ -1,9 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
-import { UpbitService } from './upbit.service';
-import { SYMBOL } from './constant';
-import { DateUtil } from './date-util';
-import { TelegramService } from './telegram.service';
-import { MathUtil } from './math-util';
+import { UpbitService } from '../upbit/upbit.service';
+import { SYMBOL } from '../shared/constant';
+import { DateUtil } from '../shared/date-util';
+import { TelegramService } from '../telegram/telegram.service';
+import { MathUtil } from '../shared/math-util';
 
 @Controller()
 export class AppController {

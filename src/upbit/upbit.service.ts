@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { HTTP_METHOD } from './constant';
+import { HTTP_METHOD } from '../shared/constant';
 import { ConfigService } from '@nestjs/config';
-import { TelegramService } from './telegram.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 @Injectable()
 export class UpbitService {
@@ -205,8 +205,24 @@ export class UpbitService {
       return response.data;
     } catch (error) {
       this.logger.error(`API 요청 에러 (${method} ${url}):`, error);
-      await this.telegramService.sendMessage(`Error ${method} ${url}}`);
-      throw error;
+
+      if (error.response) {
+        // ✅ 업비트 API에서 반환하는 에러 처리
+        const { name, message } = error.response.data.error;
+        await this.telegramService.sendMessage(
+          `❌ 업비트 API 오류 발생: ${name} - ${message}`,
+        );
+      } else if (error.request) {
+        // ✅ 서버 응답이 없을 경우 (네트워크 문제 등)
+        await this.telegramService.sendMessage(
+          `❌ 요청은 전송되었지만 응답이 없습니다.`,
+        );
+      } else {
+        // ✅ 기타 요청 설정 오류
+        await this.telegramService.sendMessage(
+          `❌ 요청 설정 중 오류 발생: ${error.message}`,
+        );
+      }
     }
   }
 }

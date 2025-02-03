@@ -1,15 +1,16 @@
-<center>
+<div align="center">
   <img src="./pepe.png">
-</center>
+  <img src="./shib.png">
+</div>
 
 ## 설명 | Description
 
-페페코인 1달러 기원
+페페코인, 시바코인 1달러 기원
 
-pepe coin 1$, let's go
+pepe, shib coin 1$, let's go
 
 ## 셋업 | Project setup
-
+env 에 텔레그램 BotFather 봇 관련 BOT_TOKEN, CHAT_ID 를 입력하면 알림을 받을 수 있습니다. 
 ```bash
 # 아래 명령어 실행 후 .env.local 에 ACCESS, SECRET KEY 작성
 $ cp .env.production .env.local

@@ -1,26 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class TelegramService {
-  private readonly botToken =
-    '7262627991:AAG_opD2AjY-PSDr9rmJzWuY5S6anPoh-uI\n';
-  private readonly chatId = '6412822135';
-
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * 텔레그램 메시지 전송
    * @param message 보낼 메시지 내용
    */
   async sendMessage(message: string): Promise<void> {
-    const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+    const botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+    const chatId = this.configService.get<string>('TELEGRAM_CHAT_ID');
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
     try {
       await firstValueFrom(
         this.httpService.post(url, {
-          chat_id: this.chatId,
+          chat_id: chatId,
           text: message,
         }),
       );

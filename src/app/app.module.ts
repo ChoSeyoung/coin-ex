@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
-import { UpbitService } from './upbit.service';
-import { SchedulerService } from './scheduler.service';
+import { AppService } from './app.service';
 import { AppController } from './app.controller';
-import { TelegramService } from './telegram.service';
 import { ConfigModule } from '@nestjs/config';
+import { UpbitModule } from '../upbit/upbit.module';
+import { TelegramModule } from '../telegram/telegram.module';
 
 @Module({
   imports: [
-    HttpModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
@@ -18,8 +17,11 @@ import { ConfigModule } from '@nestjs/config';
           ? '.env.production'
           : '.env.local',
     }),
+    HttpModule,
+    UpbitModule,
+    TelegramModule,
   ],
   controllers: [AppController],
-  providers: [UpbitService, SchedulerService, TelegramService],
+  providers: [AppService],
 })
 export class AppModule {}
