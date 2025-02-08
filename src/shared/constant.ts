@@ -7,18 +7,10 @@ export enum SYMBOL {
   KRW_SHIB = 'KRW-SHIB',
   KRW_BONK = 'KRW-BONK',
   KRW_MEW = 'KRW-MEW',
+  KRW_USDT = 'KRW-USDT',
+  KRW_USDC = 'KRW-USDC',
 }
-export const MAIN_THEME_MARKETS = [
-  SYMBOL.KRW_BTC,
-  SYMBOL.KRW_ETH,
-  SYMBOL.KRW_SOL,
-];
-export const MEME_THEME_MARKETS = [
-  // 도지코인은 리스크 관리 이후 추가
-  // SYMBOL.KRW_DOGE,
-  SYMBOL.KRW_PEPE,
-  SYMBOL.KRW_SHIB,
-];
+export const STOP_TRADE_SYMBOL = [SYMBOL.KRW_USDT, SYMBOL.KRW_USDC];
 
 export enum HTTP_METHOD {
   GET = 'GET',

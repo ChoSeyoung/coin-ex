@@ -35,7 +35,7 @@ export class AppController {
   @Get('/buy')
   async placeBuyOrder() {
     const price = 0.00001;
-    const volume = 5000 / price;
+    const volume = 10000 / price;
     return await this.upbitService.placeBuyOrder(
       SYMBOL.KRW_PEPE,
       MathUtil.roundUpTo8Decimals(volume),
@@ -46,5 +46,16 @@ export class AppController {
   @Get('/message')
   async sendMessage() {
     return await this.telegramService.sendMessage('🐸');
+  }
+
+  @Get('/order/open')
+  async getOpenOrders() {
+    return await this.upbitService.getOpenOrders('KRW-PEPE');
+  }
+
+  @Get('/order/cancel')
+  async cancelOpenOrders() {
+    const openOrders = await this.upbitService.getOpenOrders('KRW-PEPE');
+    return await this.upbitService.cancelOpenOrders(openOrders);
   }
 }

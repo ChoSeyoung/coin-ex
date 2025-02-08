@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { UpbitService } from '../upbit/upbit.service';
-import {
-  MAIN_THEME_MARKETS,
-  MEME_THEME_MARKETS,
-  QUOTE_CURRENCY,
-} from '../shared/constant';
+import { QUOTE_CURRENCY, STOP_TRADE_SYMBOL, SYMBOL } from '../shared/constant';
 import { DateUtil } from '../shared/util/date-util';
 import { ChartUtil } from '../shared/util/chart-util';
 import { TelegramService } from '../telegram/telegram.service';
@@ -15,10 +11,6 @@ import { MathUtil } from '../shared/util/math-util';
 export class AppService {
   private readonly logger = new Logger(AppService.name);
 
-  private readonly scheduledMarkets = [
-    ...MAIN_THEME_MARKETS,
-    ...MEME_THEME_MARKETS,
-  ];
   private readonly amount = 100000;
   private readonly targetProfitPercent = 0.5; // 목표 수익률 설정
   private readonly targetStopPercent = -0.75; // 목표 손실률 설정
@@ -33,19 +25,29 @@ export class AppService {
    */
   @Cron('*/1 * * * *')
   async handleTradeScheduler() {
+    console.log(new Date().toISOString());
     try {
       const markets = (
         await this.upbitService.getTickerByQuoteCurrencies(QUOTE_CURRENCY.KRW)
       )
-        .filter((market) => market.market != 'KRW-USDT')
+        .filter(
+          (market) => !STOP_TRADE_SYMBOL.includes(market.market as SYMBOL),
+        )
         .filter((market) => market.acc_trade_price_24h >= 10000000000);
 
       for (const market of markets) {
+        const openOrders = await this.upbitService.getOpenOrders(market.market);
+        if (openOrders) {
+          await this.upbitService.cancelOpenOrders(openOrders);
+        }
+
         await this.handleBuyOrder(market.market);
         await this.handleSellOrder(market.market);
       }
     } catch (error) {
       this.logger.error('스케줄러 작업 중 오류 발생: ', error);
+    } finally {
+      console.log('---');
     }
   }
 
@@ -81,7 +83,12 @@ export class AppService {
     );
     const buyThreshold = minBollingerBandPrice - minBollingerBandPrice * 0.003;
 
+    // RSI 확인 후 조건에 따라 early return 처리
     const rsi = ChartUtil.calculateRSI(closePrices, 14);
+    if (rsi > 25) {
+      console.log(`[매수] ${market} | skip`);
+      return false;
+    }
 
     const ticker = (await this.upbitService.getTickerByMarkets(market)).find(
       (obj) => obj.market === market,
@@ -89,13 +96,19 @@ export class AppService {
     const currentTickerTradePrice = ticker.trade_price;
 
     this.logger.debug(
-      `[매수] ${market} | 현재가: ${currentTickerTradePrice} | 매수가: ${buyThreshold.toFixed(5)} | RSI: ${rsi.toFixed(0)}`,
+      `[매수] ${market} | 현재가: ${currentTickerTradePrice} / 매수가: ${buyThreshold.toFixed(5)} | RSI: ${rsi.toFixed(0)}`,
     );
-    /** 매수 조건 체크 */
+    // 매수 조건 체크
     if (currentTickerTradePrice <= buyThreshold && rsi <= 25) {
-      const volume = MathUtil.roundUpTo8Decimals(
-        this.amount / currentTickerTradePrice,
-      );
+      let volume: number;
+      const asset = await this.upbitService.getAccountAsset(market);
+      if (asset) {
+        volume = (asset.balance * 2) / currentTickerTradePrice;
+      } else {
+        volume = MathUtil.roundUpTo8Decimals(
+          this.amount / currentTickerTradePrice,
+        );
+      }
 
       this.logger.log(
         `📢 ${market} 매수 주문 발생: 가격: ${currentTickerTradePrice} | 수량: ${volume}`,
@@ -110,6 +123,8 @@ export class AppService {
       await this.telegramService.sendMessage(
         `🛒 ${market} 매수 주문 발생 🛒\n 단가: ${currentTickerTradePrice}\n 수량: ${volume}\n 총액: ${currentTickerTradePrice * volume}`,
       );
+
+      return true;
     }
   }
 
@@ -125,10 +140,13 @@ export class AppService {
       const currentTickerTradePrice = ticker.trade_price;
 
       const asset = await this.upbitService.getAccountAsset(market);
-
-      if (asset && asset.avg_buy_price * asset.balance > this.amount) {
+      if (!asset) {
+        console.log(`[매도] ${market} | skip`);
+        return false;
+      }
+      if (asset.avg_buy_price * asset.balance > this.amount) {
         // 평균 매수가
-        const avgBuyPrice = parseFloat(asset.avg_buy_price);
+        const avgBuyPrice = asset.avg_buy_price;
         // 수익률
         const profitRate =
           ((currentTickerTradePrice - avgBuyPrice) / avgBuyPrice) * 100;
@@ -149,7 +167,7 @@ export class AppService {
 
           await this.upbitService.placeSellOrder(
             market,
-            parseFloat(asset.balance),
+            asset.balance,
             currentTickerTradePrice,
           );
 
@@ -163,6 +181,8 @@ export class AppService {
             );
           }
         }
+      } else {
+        console.log(``);
       }
     } catch (error) {
       this.logger.error('스케줄러 작업 중 오류 발생: ', error);

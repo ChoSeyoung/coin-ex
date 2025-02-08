@@ -29,8 +29,10 @@
     "axios": "^1.7.9",
     "bottleneck": "^2.19.5",
     "jsonwebtoken": "^9.0.2",
+    "querystring": "^0.2.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
+    "uuid": "^11.0.5",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -41,6 +43,7 @@
     "@types/jest": "^29.5.2",
     "@types/node": "^20.3.1",
     "@types/supertest": "^6.0.0",
+    "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.14",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",

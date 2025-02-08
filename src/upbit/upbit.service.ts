@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AxiosRequestConfig } from 'axios';
@@ -6,10 +7,17 @@ import { HTTP_METHOD, QUOTE_CURRENCY } from '../shared/constant';
 import { ConfigService } from '@nestjs/config';
 import { TelegramService } from '../telegram/telegram.service';
 import {
+  AccountResponse,
+  CancelOrderResponse,
+  MinuteCandleResponse,
+  OpenOrderResponse,
+  OrderResponse,
   TickerResponse,
   UpbitMarketResponse,
 } from '../shared/interface/upbit.interface';
 import Bottleneck from 'bottleneck';
+import * as querystring from 'querystring';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class UpbitService {
@@ -76,21 +84,22 @@ export class UpbitService {
     market: string,
     to?: string,
     count: number = 200,
-  ): Promise<any> {
+  ): Promise<MinuteCandleResponse[]> {
     const url = `/v1/candles/minutes/${unit}?market=${market}&to=${to}&count=${count}`;
-    return this.sendRequest(HTTP_METHOD.GET, url);
+    return this.sendRequest<MinuteCandleResponse[]>(HTTP_METHOD.GET, url);
   }
 
   /**
    * 내 계좌 정보를 조회합니다.
    * @returns 계좌 정보 (선텍한 자산)
    */
-  async getAccountAsset(market: string): Promise<any> {
+  async getAccountAsset(market: string): Promise<AccountResponse> {
     const endpoint = '/v1/accounts';
-    const accounts = await this.sendAuthenticatedRequest(
+    const accounts = await this.sendAuthenticatedRequest<AccountResponse[]>(
       HTTP_METHOD.GET,
       endpoint,
     );
+
     return accounts.find(
       (account) => `${account.unit_currency}-${account.currency}` === market,
     );
@@ -99,9 +108,12 @@ export class UpbitService {
    * 내 계좌 정보를 조회합니다.
    * @returns 계좌 정보 배열 (보유한 자산 목록)
    */
-  async getAccounts(): Promise<any> {
+  async getAccounts(): Promise<AccountResponse[]> {
     const endpoint = '/v1/accounts';
-    return this.sendAuthenticatedRequest(HTTP_METHOD.GET, endpoint);
+    return this.sendAuthenticatedRequest<AccountResponse[]>(
+      HTTP_METHOD.GET,
+      endpoint,
+    );
   }
 
   /**
@@ -114,7 +126,7 @@ export class UpbitService {
     market: string,
     volume: number,
     price: number,
-  ): Promise<any> {
+  ): Promise<OrderResponse> {
     const endpoint = '/v1/orders';
     const params = {
       market,
@@ -124,7 +136,11 @@ export class UpbitService {
       ord_type: 'limit',
     };
 
-    return this.sendAuthenticatedRequest(HTTP_METHOD.POST, endpoint, params);
+    return this.sendAuthenticatedRequest<OrderResponse>(
+      HTTP_METHOD.POST,
+      endpoint,
+      params,
+    );
   }
 
   /**
@@ -137,7 +153,7 @@ export class UpbitService {
     market: string,
     volume: number,
     price: number,
-  ): Promise<any> {
+  ): Promise<OrderResponse> {
     const endpoint = '/v1/orders';
     const params = {
       market,
@@ -147,26 +163,63 @@ export class UpbitService {
       ord_type: 'limit',
     };
 
-    return this.sendAuthenticatedRequest(HTTP_METHOD.POST, endpoint, params);
+    return this.sendAuthenticatedRequest<OrderResponse>(
+      HTTP_METHOD.POST,
+      endpoint,
+      params,
+    );
+  }
+
+  /**
+   * 미체결 주문 조회
+   */
+  async getOpenOrders(market: string): Promise<OpenOrderResponse[]> {
+    const endpoint = '/v1/orders/open';
+    const params = { market, state: 'wait' };
+
+    return this.sendAuthenticatedRequest<OpenOrderResponse[]>(
+      HTTP_METHOD.GET,
+      endpoint,
+      params,
+    );
+  }
+
+  async cancelOpenOrders(
+    openOrders: OpenOrderResponse[],
+  ): Promise<CancelOrderResponse[]> {
+    const endpoint = '/v1/order';
+
+    const result: CancelOrderResponse[] = [];
+    for (const openOrder of openOrders) {
+      const params = { uuid: openOrder.uuid };
+
+      const response = await this.sendAuthenticatedRequest<CancelOrderResponse>(
+        HTTP_METHOD.DELETE,
+        endpoint,
+        params,
+      );
+
+      result.push(response);
+    }
+
+    return result;
   }
 
   /**
    * 인증이 필요 없는 API 요청을 수행합니다.
    * @param method HTTP 요청 메서드 (GET, POST 등)
    * @param endpoint
-   * @param params 요청 파라미터 (옵션)
    */
   private async sendRequest<T>(
     method: HTTP_METHOD,
     endpoint: string, // 전체 URL 대신 endpoint만 받음
-    params?: any,
   ): Promise<T> {
-    const url = `${this.BASE_URL}${endpoint}`; // 기본 URL + endpoint 조합
+    // 기본 URL + endpoint 조합
+    const url = `${this.BASE_URL}${endpoint}`;
 
     const config: AxiosRequestConfig = {
       method,
       url,
-      ...(params && method !== HTTP_METHOD.GET ? { data: params } : {}), // GET 제외
     };
 
     try {
@@ -177,7 +230,7 @@ export class UpbitService {
       return response.data;
     } catch (error) {
       this.logger.error(`API 요청 에러 (${method} ${url}):`, error);
-      throw error;
+      await this.handleApiError(error);
     }
   }
 
@@ -188,60 +241,49 @@ export class UpbitService {
    * @param endpoint 요청 엔드포인트
    * @param params 요청 파라미터 (옵션)
    */
-  private async sendAuthenticatedRequest(
+  private async sendAuthenticatedRequest<T>(
     method: HTTP_METHOD,
     endpoint: string,
-    params: any = {},
-  ): Promise<any> {
-    const nonce = Date.now().toString();
-
+    params: Record<string, any> = {},
+  ): Promise<T> {
     // 파라미터들을 정렬하여 쿼리 문자열 생성
-    const query = Object.keys(params)
-      .sort()
-      .map((key) => `${key}=${params[key]}`)
-      .join('&');
+    const query = querystring.stringify(params);
+
+    // query_hash 생성 (SHA512)
+    const queryHash = crypto.createHash('sha512').update(query).digest('hex');
 
     // JWT payload 구성
     const payload = {
       access_key: this.configService.get<string>('API_ACCESS_KEY'),
-      nonce,
-      ...(method === HTTP_METHOD.GET ? { query } : { query }), // GET 요청일 경우만 포함
+      nonce: uuidv4(),
+      query_hash: queryHash,
+      query_hash_alg: 'SHA512',
     };
 
     // jsonwebtoken 라이브러리를 이용하여 JWT 토큰 생성
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const jwt = require('jsonwebtoken');
     const token = jwt.sign(
       payload,
       this.configService.get<string>('API_SECRET_KEY'),
     );
 
+    let url = `${this.BASE_URL}${endpoint}`;
+    if (query) {
+      url += `?${query}`;
+    }
+
     const config: AxiosRequestConfig = {
+      method,
+      url,
       headers: {
         Authorization: `Bearer ${token}`,
       },
     };
 
-    let url = `${this.BASE_URL}${endpoint}`;
-    if (method === HTTP_METHOD.GET && query) {
-      url += `?${query}`;
-    }
-
     try {
-      // Bottleneck으로 인증 요청에도 속도 제한 적용
+      // Bottleneck 으로 인증 요청에도 속도 제한 적용
       const response = await this.limiter.schedule(() => {
-        if (method === HTTP_METHOD.GET) {
-          return firstValueFrom(this.httpService.get(url, config));
-        } else {
-          return firstValueFrom(
-            this.httpService.request({
-              method,
-              url,
-              data: params,
-              ...config,
-            }),
-          );
-        }
+        return firstValueFrom(this.httpService.request(config));
       });
 
       return response.data;
