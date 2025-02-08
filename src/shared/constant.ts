@@ -18,8 +18,6 @@ export const MEME_THEME_MARKETS = [
   // SYMBOL.KRW_DOGE,
   SYMBOL.KRW_PEPE,
   SYMBOL.KRW_SHIB,
-  SYMBOL.KRW_BONK,
-  SYMBOL.KRW_MEW,
 ];
 
 export enum HTTP_METHOD {
@@ -30,4 +28,10 @@ export enum HTTP_METHOD {
   PATCH = 'PATCH',
   HEAD = 'HEAD',
   OPTIONS = 'OPTIONS',
+}
+
+export enum QUOTE_CURRENCY {
+  KRW = 'KRW',
+  BTC = 'BTC',
+  USDT = 'USDT',
 }

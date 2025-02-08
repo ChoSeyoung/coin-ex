@@ -1,16 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { HTTP_METHOD } from '../shared/constant';
+import { AxiosRequestConfig } from 'axios';
+import { HTTP_METHOD, QUOTE_CURRENCY } from '../shared/constant';
 import { ConfigService } from '@nestjs/config';
 import { TelegramService } from '../telegram/telegram.service';
+import {
+  TickerResponse,
+  UpbitMarketResponse,
+} from '../shared/interface/upbit.interface';
+import Bottleneck from 'bottleneck';
 
 @Injectable()
 export class UpbitService {
   private readonly logger = new Logger(UpbitService.name);
 
   private readonly BASE_URL = 'https://api.upbit.com';
+
+  // Bottleneck 인스턴스 추가 (초당 5회 요청 제한)
+  private readonly limiter = new Bottleneck({
+    minTime: 100, // 최소 요청 간격 (200ms = 초당 5회)
+  });
 
   constructor(
     private readonly httpService: HttpService,
@@ -19,12 +29,39 @@ export class UpbitService {
   ) {}
 
   /**
-   * 지정한 마켓의 티커 데이터를 조회합니다.
+   * 업비트에서 거래 가능한 종목 목록을 조회합니다.
+   * @param quoteCurrency 재화 (KRW | BTC | USDT)
+   */
+  async getAllMarket(quoteCurrency: QUOTE_CURRENCY): Promise<string[]> {
+    const url = `/v1/market/all?is_details=true`;
+    const markets = await this.sendRequest<UpbitMarketResponse[]>(
+      HTTP_METHOD.GET,
+      url,
+    );
+
+    return markets
+      .filter((market) => market.market.startsWith(quoteCurrency))
+      .map((market) => market.market);
+  }
+
+  /**
+   * 지정한 종목단위의 티커 데이터를 조회합니다.
    * @param market 마켓 코드 (ex. KRW-BTC)
    */
-  async getTicker(market: string): Promise<any> {
+  async getTickerByMarkets(market: string): Promise<TickerResponse[]> {
     const url = `/v1/ticker?markets=${market}`;
-    return this.sendRequest(HTTP_METHOD.GET, url);
+    return this.sendRequest<TickerResponse[]>(HTTP_METHOD.GET, url);
+  }
+
+  /**
+   * 지정한 마켓단위의 티커 데이터를 조회합니다.
+   * @param quoteCurrency 재화 (KRW | BTC | USDT)
+   */
+  async getTickerByQuoteCurrencies(
+    quoteCurrency: QUOTE_CURRENCY,
+  ): Promise<TickerResponse[]> {
+    const url = `/v1/ticker/all?quote_currencies=${quoteCurrency}`;
+    return this.sendRequest<TickerResponse[]>(HTTP_METHOD.GET, url);
   }
 
   /**
@@ -119,11 +156,11 @@ export class UpbitService {
    * @param endpoint
    * @param params 요청 파라미터 (옵션)
    */
-  private async sendRequest(
+  private async sendRequest<T>(
     method: HTTP_METHOD,
     endpoint: string, // 전체 URL 대신 endpoint만 받음
     params?: any,
-  ): Promise<any> {
+  ): Promise<T> {
     const url = `${this.BASE_URL}${endpoint}`; // 기본 URL + endpoint 조합
 
     const config: AxiosRequestConfig = {
@@ -133,7 +170,10 @@ export class UpbitService {
     };
 
     try {
-      const response = await firstValueFrom(this.httpService.request(config));
+      // Bottleneck을 통해 요청 제한 적용
+      const response = await this.limiter.schedule(() =>
+        firstValueFrom(this.httpService.request(config)),
+      );
       return response.data;
     } catch (error) {
       this.logger.error(`API 요청 에러 (${method} ${url}):`, error);
@@ -144,10 +184,9 @@ export class UpbitService {
   /**
    * 인증이 필요한 주문 API 호출을 수행합니다.
    * Upbit의 인증 방식에 따라 JWT 토큰 생성 및 헤더 설정을 진행합니다.
-   * @param method
-   * @param endpoint
-   * @param params
-   * @private
+   * @param method HTTP 요청 메서드
+   * @param endpoint 요청 엔드포인트
+   * @param params 요청 파라미터 (옵션)
    */
   private async sendAuthenticatedRequest(
     method: HTTP_METHOD,
@@ -189,40 +228,50 @@ export class UpbitService {
     }
 
     try {
-      let response: AxiosResponse<any, any>;
-      if (method === HTTP_METHOD.GET) {
-        response = await firstValueFrom(this.httpService.get(url, config));
-      } else {
-        response = await firstValueFrom(
-          this.httpService.request({
-            method,
-            url,
-            data: params,
-            ...config,
-          }),
-        );
-      }
+      // Bottleneck으로 인증 요청에도 속도 제한 적용
+      const response = await this.limiter.schedule(() => {
+        if (method === HTTP_METHOD.GET) {
+          return firstValueFrom(this.httpService.get(url, config));
+        } else {
+          return firstValueFrom(
+            this.httpService.request({
+              method,
+              url,
+              data: params,
+              ...config,
+            }),
+          );
+        }
+      });
+
       return response.data;
     } catch (error) {
       this.logger.error(`API 요청 에러 (${method} ${url}):`, error);
+      await this.handleApiError(error);
+    }
+  }
 
-      if (error.response) {
-        // ✅ 업비트 API에서 반환하는 에러 처리
-        const { name, message } = error.response.data.error;
-        await this.telegramService.sendMessage(
-          `❌ 업비트 API 오류 발생: ${name} - ${message}`,
-        );
-      } else if (error.request) {
-        // ✅ 서버 응답이 없을 경우 (네트워크 문제 등)
-        await this.telegramService.sendMessage(
-          `❌ 요청은 전송되었지만 응답이 없습니다.`,
-        );
-      } else {
-        // ✅ 기타 요청 설정 오류
-        await this.telegramService.sendMessage(
-          `❌ 요청 설정 중 오류 발생: ${error.message}`,
-        );
-      }
+  /**
+   * 업비트 API 에러 처리
+   * @param error API 요청 에러 객체
+   */
+  private async handleApiError(error: any): Promise<void> {
+    if (error.response) {
+      // ✅ 업비트 API에서 반환하는 에러 처리
+      const { name, message } = error.response.data.error;
+      await this.telegramService.sendMessage(
+        `❌ 업비트 API 오류 발생: ${name} - ${message}`,
+      );
+    } else if (error.request) {
+      // ✅ 서버 응답이 없을 경우 (네트워크 문제 등)
+      await this.telegramService.sendMessage(
+        `❌ 요청은 전송되었지만 응답이 없습니다.`,
+      );
+    } else {
+      // ✅ 기타 요청 설정 오류
+      await this.telegramService.sendMessage(
+        `❌ 요청 설정 중 오류 발생: ${error.message}`,
+      );
     }
   }
 }

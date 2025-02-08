@@ -1,9 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { UpbitService } from '../upbit/upbit.service';
 import { SYMBOL } from '../shared/constant';
-import { DateUtil } from '../shared/date-util';
+import { DateUtil } from '../shared/util/date-util';
 import { TelegramService } from '../telegram/telegram.service';
-import { MathUtil } from '../shared/math-util';
+import { MathUtil } from '../shared/util/math-util';
 
 @Controller()
 export class AppController {
@@ -14,7 +14,7 @@ export class AppController {
 
   @Get('/ticker')
   async getTicker() {
-    return await this.upbitService.getTicker(SYMBOL.KRW_PEPE);
+    return await this.upbitService.getTickerByMarkets(SYMBOL.KRW_PEPE);
   }
 
   @Get('/candle/minute')

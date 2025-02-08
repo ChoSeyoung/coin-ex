@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { UpbitService } from '../upbit/upbit.service';
-import { MAIN_THEME_MARKETS, MEME_THEME_MARKETS } from '../shared/constant';
-import { DateUtil } from '../shared/date-util';
-import { ChartUtil } from '../shared/chart-util';
+import {
+  MAIN_THEME_MARKETS,
+  MEME_THEME_MARKETS,
+  QUOTE_CURRENCY,
+} from '../shared/constant';
+import { DateUtil } from '../shared/util/date-util';
+import { ChartUtil } from '../shared/util/chart-util';
 import { TelegramService } from '../telegram/telegram.service';
-import { MathUtil } from '../shared/math-util';
+import { MathUtil } from '../shared/util/math-util';
 
 @Injectable()
 export class AppService {
@@ -15,9 +19,9 @@ export class AppService {
     ...MAIN_THEME_MARKETS,
     ...MEME_THEME_MARKETS,
   ];
-  private readonly amount = 10000;
-  private readonly targetProfitPercent = 1.0; // 목표 수익률 설정
-  private readonly targetStopPercent = -1.0; // 목표 손실률 설정
+  private readonly amount = 100000;
+  private readonly targetProfitPercent = 0.5; // 목표 수익률 설정
+  private readonly targetStopPercent = -0.75; // 목표 손실률 설정
 
   constructor(
     private readonly upbitService: UpbitService,
@@ -30,9 +34,15 @@ export class AppService {
   @Cron('*/1 * * * *')
   async handleTradeScheduler() {
     try {
-      for (const market of this.scheduledMarkets) {
-        await this.handleBuyOrder(market);
-        await this.handleSellOrder(market);
+      const markets = (
+        await this.upbitService.getTickerByQuoteCurrencies(QUOTE_CURRENCY.KRW)
+      )
+        .filter((market) => market.market != 'KRW-USDT')
+        .filter((market) => market.acc_trade_price_24h >= 10000000000);
+
+      for (const market of markets) {
+        await this.handleBuyOrder(market.market);
+        await this.handleSellOrder(market.market);
       }
     } catch (error) {
       this.logger.error('스케줄러 작업 중 오류 발생: ', error);
@@ -69,20 +79,20 @@ export class AppService {
       bollingerBand60.lower,
       bollingerBand20.lower,
     );
-    const buyThreshold = minBollingerBandPrice - minBollingerBandPrice * 0.002;
+    const buyThreshold = minBollingerBandPrice - minBollingerBandPrice * 0.003;
 
     const rsi = ChartUtil.calculateRSI(closePrices, 14);
 
-    const ticker = (await this.upbitService.getTicker(market)).find(
+    const ticker = (await this.upbitService.getTickerByMarkets(market)).find(
       (obj) => obj.market === market,
     );
     const currentTickerTradePrice = ticker.trade_price;
 
     this.logger.debug(
-      `[매수] 현재가: ${currentTickerTradePrice} | 매수가: ${buyThreshold.toFixed(5)} | RSI: ${rsi.toFixed(0)}`,
+      `[매수] ${market} | 현재가: ${currentTickerTradePrice} | 매수가: ${buyThreshold.toFixed(5)} | RSI: ${rsi.toFixed(0)}`,
     );
     /** 매수 조건 체크 */
-    if (currentTickerTradePrice <= buyThreshold && rsi <= 30) {
+    if (currentTickerTradePrice <= buyThreshold && rsi <= 25) {
       const volume = MathUtil.roundUpTo8Decimals(
         this.amount / currentTickerTradePrice,
       );
@@ -109,7 +119,7 @@ export class AppService {
    */
   async handleSellOrder(market: string) {
     try {
-      const ticker = (await this.upbitService.getTicker(market)).find(
+      const ticker = (await this.upbitService.getTickerByMarkets(market)).find(
         (obj) => obj.market === market,
       );
       const currentTickerTradePrice = ticker.trade_price;
