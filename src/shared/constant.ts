@@ -27,3 +27,6 @@ export enum QUOTE_CURRENCY {
   BTC = 'BTC',
   USDT = 'USDT',
 }
+
+// 거래소 수수료 (0.05%)
+export const UPBIT_FEE_RATE = 0.0005;

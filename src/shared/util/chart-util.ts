@@ -94,4 +94,17 @@ export class ChartUtil {
     // RSI 계산
     return 100 - 100 / (1 + au / ad);
   }
+
+  /**
+   * 단순 이동평균(SMA) 계산
+   * @param closes 숫자 배열 (가격 리스트)
+   * @param period 계산 기간
+   */
+  static calculateSMA(closes: number[], period: number): number {
+    if (closes.length < period) {
+      throw new Error('Not enough data to calculate SMA');
+    }
+    const sum = closes.reduce((acc, price) => acc + price, 0);
+    return sum / period;
+  }
 }
