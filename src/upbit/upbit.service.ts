@@ -27,7 +27,7 @@ export class UpbitService {
 
   // Bottleneck 인스턴스 추가 (초당 5회 요청 제한)
   private readonly limiter = new Bottleneck({
-    minTime: 100, // 최소 요청 간격 (200ms = 초당 5회)
+    minTime: 200, // 최소 요청 간격 (200ms = 초당 5회)
   });
 
   constructor(
@@ -261,6 +261,7 @@ export class UpbitService {
     };
 
     // jsonwebtoken 라이브러리를 이용하여 JWT 토큰 생성
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const jwt = require('jsonwebtoken');
     const token = jwt.sign(
       payload,

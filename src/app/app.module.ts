@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
-import { AppService } from './app.service';
+import { DeepDetectService } from './deep-detect.service';
 import { AppController } from './app.controller';
 import { ConfigModule } from '@nestjs/config';
 import { UpbitModule } from '../upbit/upbit.module';
 import { TelegramModule } from '../telegram/telegram.module';
+import { VolumeSpikeService } from './volume-spike.service';
 
 @Module({
   imports: [
@@ -22,6 +23,6 @@ import { TelegramModule } from '../telegram/telegram.module';
     TelegramModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [DeepDetectService, VolumeSpikeService],
 })
 export class AppModule {}

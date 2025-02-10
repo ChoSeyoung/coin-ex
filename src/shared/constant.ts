@@ -9,8 +9,13 @@ export enum SYMBOL {
   KRW_MEW = 'KRW-MEW',
   KRW_USDT = 'KRW-USDT',
   KRW_USDC = 'KRW-USDC',
+  KRW_SBD = 'KRW-SBD',
 }
-export const STOP_TRADE_SYMBOL = [SYMBOL.KRW_USDT, SYMBOL.KRW_USDC];
+export const STOP_TRADE_SYMBOL = [
+  SYMBOL.KRW_USDT,
+  SYMBOL.KRW_USDC,
+  SYMBOL.KRW_SBD,
+];
 
 export enum HTTP_METHOD {
   GET = 'GET',
