@@ -18,7 +18,7 @@ export class DeepDetectService {
   private readonly logger = new Logger(DeepDetectService.name);
 
   private readonly amount = 100000;
-  private readonly targetProfitPercent = 0.3; // 목표 수익률 설정
+  private readonly targetProfitPercent = 0.4; // 목표 수익률 설정
   private readonly targetStopPercent = -0.5; // 목표 손실률 설정
 
   constructor(
@@ -59,27 +59,26 @@ export class DeepDetectService {
   /**
    * 매 1분 마다 조건에 따라 매도를 실행합니다.
    */
-  @Cron('*/1 * * * *')
+  @Cron('*/15 * * * * *')
   async handleSellScheduler() {
     try {
-      const markets = (
-        await this.upbitService.getTickerByQuoteCurrencies(QUOTE_CURRENCY.KRW)
-      )
-        .filter(
-          (market) => !STOP_TRADE_SYMBOL.includes(market.market as SYMBOL),
-        )
-        .filter(
-          (market) => !SELF_TRADE_SYMBOL.includes(market.market as SYMBOL),
-        )
-        .filter((market) => market.acc_trade_price_24h >= 10000000000);
+      const accounts = await this.upbitService.getAccounts();
 
-      for (const market of markets) {
-        const openOrders = await this.upbitService.getOpenOrders(market.market);
+      for (const account of accounts) {
+        const market = `${account.unit_currency}-${account.currency}`;
+        if (
+          account.currency === 'KRW' ||
+          STOP_TRADE_SYMBOL.includes(market as SYMBOL)
+        ) {
+          continue;
+        }
+
+        const openOrders = await this.upbitService.getOpenOrders(market);
         if (openOrders) {
           await this.upbitService.cancelOpenOrders(openOrders);
         }
 
-        await this.handleSellOrder(market.market);
+        await this.handleSellOrder(market);
       }
     } catch (error) {
       this.logger.error('스케줄러 작업 중 오류 발생: ', error);
