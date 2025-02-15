@@ -17,7 +17,7 @@ import { MathUtil } from '../shared/util/math-util';
 export class DeepDetectService {
   private readonly logger = new Logger(DeepDetectService.name);
 
-  private readonly amount = 1000000;
+  private readonly amount = 100000;
   private readonly targetProfitPercent = 0.3; // 목표 수익률 설정
   private readonly targetStopPercent = -0.5; // 목표 손실률 설정
 
@@ -40,7 +40,8 @@ export class DeepDetectService {
         )
         .filter(
           (market) => !SELF_TRADE_SYMBOL.includes(market.market as SYMBOL),
-        );
+        )
+        .filter((market) => market.acc_trade_price_24h >= 10000000000);
 
       for (const market of markets) {
         const openOrders = await this.upbitService.getOpenOrders(market.market);
@@ -69,7 +70,8 @@ export class DeepDetectService {
         )
         .filter(
           (market) => !SELF_TRADE_SYMBOL.includes(market.market as SYMBOL),
-        );
+        )
+        .filter((market) => market.acc_trade_price_24h >= 10000000000);
 
       for (const market of markets) {
         const openOrders = await this.upbitService.getOpenOrders(market.market);

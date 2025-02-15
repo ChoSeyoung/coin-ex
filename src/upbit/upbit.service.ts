@@ -27,7 +27,7 @@ export class UpbitService {
 
   // Bottleneck 인스턴스 추가 (초당 5회 요청 제한)
   private readonly limiter = new Bottleneck({
-    minTime: 200, // 최소 요청 간격 (200ms = 초당 5회)
+    minTime: 100, // 최소 요청 간격 (200ms = 초당 5회)
   });
 
   constructor(
