@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { UpbitService } from '../upbit/upbit.service';
 import {
   QUOTE_CURRENCY,
+  SELF_TRADE_SYMBOL,
   STOP_TRADE_SYMBOL,
   SYMBOL,
   UPBIT_FEE_RATE,
@@ -17,7 +18,7 @@ export class DeepDetectService {
   private readonly logger = new Logger(DeepDetectService.name);
 
   private readonly amount = 1000000;
-  private readonly targetProfitPercent = 0.2; // 목표 수익률 설정
+  private readonly targetProfitPercent = 0.3; // 목표 수익률 설정
   private readonly targetStopPercent = -0.5; // 목표 손실률 설정
 
   constructor(
@@ -26,11 +27,10 @@ export class DeepDetectService {
   ) {}
 
   /**
-   * 매 1분 마다 조건에 따라 매수 및 매도를 실행합니다.
+   * 매 1분 마다 조건에 따라 매수를 실행합니다.
    */
-  @Cron('*/1 * * * *')
-  async handleTradeScheduler() {
-    console.log(new Date().toISOString());
+  @Cron('*/15 * * * *')
+  async handleBuyScheduler() {
     try {
       const markets = (
         await this.upbitService.getTickerByQuoteCurrencies(QUOTE_CURRENCY.KRW)
@@ -38,7 +38,9 @@ export class DeepDetectService {
         .filter(
           (market) => !STOP_TRADE_SYMBOL.includes(market.market as SYMBOL),
         )
-        .filter((market) => market.acc_trade_price_24h >= 50000000000);
+        .filter(
+          (market) => !SELF_TRADE_SYMBOL.includes(market.market as SYMBOL),
+        );
 
       for (const market of markets) {
         const openOrders = await this.upbitService.getOpenOrders(market.market);
@@ -47,12 +49,38 @@ export class DeepDetectService {
         }
 
         await this.handleBuyOrder(market.market);
+      }
+    } catch (error) {
+      this.logger.error('스케줄러 작업 중 오류 발생: ', error);
+    }
+  }
+
+  /**
+   * 매 1분 마다 조건에 따라 매도를 실행합니다.
+   */
+  @Cron('*/1 * * * *')
+  async handleSellScheduler() {
+    try {
+      const markets = (
+        await this.upbitService.getTickerByQuoteCurrencies(QUOTE_CURRENCY.KRW)
+      )
+        .filter(
+          (market) => !STOP_TRADE_SYMBOL.includes(market.market as SYMBOL),
+        )
+        .filter(
+          (market) => !SELF_TRADE_SYMBOL.includes(market.market as SYMBOL),
+        );
+
+      for (const market of markets) {
+        const openOrders = await this.upbitService.getOpenOrders(market.market);
+        if (openOrders) {
+          await this.upbitService.cancelOpenOrders(openOrders);
+        }
+
         await this.handleSellOrder(market.market);
       }
     } catch (error) {
       this.logger.error('스케줄러 작업 중 오류 발생: ', error);
-    } finally {
-      console.log('---');
     }
   }
 
@@ -62,7 +90,7 @@ export class DeepDetectService {
   async handleBuyOrder(market: string) {
     const candles = (
       await this.upbitService.getMinuteCandles(
-        1,
+        15,
         market,
         DateUtil.formatTimestamp(new Date()),
         200,
@@ -71,22 +99,13 @@ export class DeepDetectService {
 
     const closePrices = candles.map((candle) => candle.trade_price);
 
-    const bollingerBand60 = ChartUtil.calculateBollingerBands(
+    const bollingerBand100 = ChartUtil.calculateBollingerBands(
       closePrices,
-      60,
-      2.0,
-    );
-    const bollingerBand20 = ChartUtil.calculateBollingerBands(
-      closePrices,
-      20,
+      100,
       2.0,
     );
 
-    const minBollingerBandPrice = Math.min(
-      bollingerBand60.lower,
-      bollingerBand20.lower,
-    );
-    const buyThreshold = minBollingerBandPrice * (1 - 0.002);
+    const buyThreshold = bollingerBand100.lower;
 
     // RSI 확인 후 조건에 따라 early return 처리
     const rsi = ChartUtil.calculateRSI(closePrices, 14);
@@ -160,11 +179,8 @@ export class DeepDetectService {
       this.logger.debug(
         `[매도] 현재가: ${currentTickerTradePrice} | 수익률: ${profitRate}`,
       );
-      // 목표 수익률/손실률 도달 시 매도
-      if (
-        profitRate >= this.targetProfitPercent ||
-        profitRate <= this.targetStopPercent
-      ) {
+      // 목표 수익률 도달 시 매도
+      if (profitRate >= this.targetProfitPercent) {
         this.logger.log(
           `✅ ${market} 매도 주문 발생 (수익률: ${profitRate.toFixed(2)}%)`,
         );
@@ -195,10 +211,6 @@ export class DeepDetectService {
         if (profitRate >= this.targetProfitPercent) {
           await this.telegramService.sendMessage(
             `📈 ${market} 수익 주문 발생 📈\n 수익률: ${profitRate.toFixed(2)}%\n 단가: ${currentTickerTradePrice}\n 수량: ${asset.balance}\n 순수익: ${netProfit.toFixed(0)}`,
-          );
-        } else {
-          await this.telegramService.sendMessage(
-            `📉 ${market} 손실 주문 발생 📉\n 손실률: ${profitRate.toFixed(2)}%\n 단가: ${currentTickerTradePrice}\n 수량: ${asset.balance}\n 순수익: ${netProfit.toFixed(0)}`,
           );
         }
       }
