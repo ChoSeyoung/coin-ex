@@ -6,7 +6,6 @@ import { AppController } from './app.controller';
 import { ConfigModule } from '@nestjs/config';
 import { UpbitModule } from '../upbit/upbit.module';
 import { TelegramModule } from '../telegram/telegram.module';
-import { VolumeSpikeService } from './volume-spike.service';
 
 @Module({
   imports: [
@@ -23,6 +22,6 @@ import { VolumeSpikeService } from './volume-spike.service';
     TelegramModule,
   ],
   controllers: [AppController],
-  providers: [DeepDetectService, VolumeSpikeService],
+  providers: [DeepDetectService],
 })
 export class AppModule {}
