@@ -10,9 +10,10 @@ export enum SYMBOL {
   KRW_USDT = 'KRW-USDT',
   KRW_USDC = 'KRW-USDC',
   KRW_MOCA = 'KRW-MOCA',
+  KRW_ONDO = 'KRW-ONDO',
 }
 export const STOP_TRADE_SYMBOL = [SYMBOL.KRW_USDT, SYMBOL.KRW_USDC];
-export const SELF_TRADE_SYMBOL = [];
+export const SELF_TRADE_SYMBOL = [SYMBOL.KRW_MOCA, SYMBOL.KRW_ONDO];
 
 export enum HTTP_METHOD {
   GET = 'GET',
@@ -32,3 +33,5 @@ export enum QUOTE_CURRENCY {
 
 // 거래소 수수료 (0.05%)
 export const UPBIT_FEE_RATE = 0.0005;
+// 최소 주문 금액 (5000원)
+export const UPBIT_MIN_TRADE_AMOUNT = 5000;
