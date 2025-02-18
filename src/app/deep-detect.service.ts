@@ -19,7 +19,7 @@ export class DeepDetectService {
   private readonly logger = new Logger(DeepDetectService.name);
 
   private readonly amount = 2000000;
-  private readonly targetProfitPercent = 0.5; // 목표 수익률 설정
+  private readonly targetProfitPercent = 0.3; // 목표 수익률 설정
   private readonly targetStopPercent = -0.5; // 목표 손실률 설정
   private readonly targetRSI = 20;
 
@@ -61,7 +61,7 @@ export class DeepDetectService {
   /**
    * 매 15초 마다 조건에 따라 매도를 실행합니다.
    */
-  @Cron('*/30 * * * * *')
+  @Cron('*/5 * * * * *')
   async handleSellScheduler() {
     try {
       const accounts = await this.upbitService.getAccounts();
